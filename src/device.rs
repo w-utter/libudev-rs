@@ -14,6 +14,7 @@ use std::ptr::NonNull;
 
 pub unsafe fn from_raw(device: *mut ::ffi::udev_device) -> Device {
     ::ffi::udev_ref(::ffi::udev_device_get_udev(device));
+    let device = NonNull::new_unchecked(device);
 
     Device { device }
 }
@@ -38,7 +39,7 @@ impl Drop for Device {
 #[doc(hidden)]
 impl Handle<::ffi::udev_device> for Device {
     fn as_ptr(&self) -> *mut ::ffi::udev_device {
-        self.device
+        self.device.as_ptr()
     }
 }
 
@@ -53,7 +54,7 @@ impl Device {
         Ok(unsafe {
             //SAFETY: null pointers will be checked by the try_alloc macro
             from_raw(try_alloc!(
-                ::ffi::udev_device_new_from_syspath(NonNull::new_unchecked(context.as_ptr()), syspath.as_ptr())
+                ::ffi::udev_device_new_from_syspath(context, syspath.as_ptr())
             ))
         })
     }
@@ -327,7 +328,7 @@ impl<'a> Iterator for Attributes<'a> {
             self.entry = unsafe { ::ffi::udev_list_entry_get_next(self.entry) };
 
             Some(Attribute {
-                device: self.device.as_ref(),
+                device: self.device,
                 name,
             })
         }

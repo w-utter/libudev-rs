@@ -1,5 +1,5 @@
 use ::handle::Handle;
-use core::ptr::NonNull;
+use std::ptr::NonNull;
 
 /// A libudev context. Contexts may not be sent or shared between threads. The `libudev(3)` manpage
 /// says:
