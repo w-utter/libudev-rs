@@ -1,4 +1,5 @@
 use ::handle::Handle;
+use core::ptr::NonNull;
 
 /// A libudev context. Contexts may not be sent or shared between threads. The `libudev(3)` manpage
 /// says:
@@ -16,14 +17,14 @@ use ::handle::Handle;
 /// Other types in this library (`Device`, `Enumerator`, `Monitor`, etc.) share a reference to a
 /// context, which means that these types must also be `!Send` and `!Sync`.
 pub struct Context {
-    udev: *mut ::ffi::udev,
+    udev: NonNull<::ffi::udev>,
 }
 
 impl Clone for Context {
     /// Increments reference count of `libudev` context.
     fn clone(&self) -> Self {
         Context {
-            udev: unsafe { ::ffi::udev_ref(self.udev) },
+            udev: unsafe { ::ffi::udev_ref(self.udev.as_mut()) },
         }
     }
 }
@@ -32,7 +33,7 @@ impl Drop for Context {
     /// Decrements reference count of `libudev` context.
     fn drop(&mut self) {
         unsafe {
-            ::ffi::udev_unref(self.udev);
+            ::ffi::udev_unref(self.udev.as_ptr());
         }
     }
 }
@@ -40,7 +41,7 @@ impl Drop for Context {
 #[doc(hidden)]
 impl Handle<::ffi::udev> for Context {
     fn as_ptr(&self) -> *mut ::ffi::udev {
-        self.udev
+        unsafe {self.udev.as_ptr() }
     }
 }
 
@@ -48,7 +49,8 @@ impl Context {
     /// Creates a new context.
     pub fn new() -> ::Result<Self> {
         Ok(Context {
-            udev: try_alloc!(unsafe { ::ffi::udev_new() }),
+            //SAFETY: the try_alloc will catch any null ptrs
+            udev: try_alloc!(unsafe { NonNull::new_unchecked(::ffi::udev_new()) }),
         })
     }
 }

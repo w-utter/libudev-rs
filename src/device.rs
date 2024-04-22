@@ -9,26 +9,27 @@ use libc::{c_char, dev_t};
 
 use ::context::Context;
 use ::handle::Handle;
+use core::ptr::NonNull;
 
 
 pub unsafe fn from_raw(device: *mut ::ffi::udev_device) -> Device {
     ::ffi::udev_ref(::ffi::udev_device_get_udev(device));
 
-    Device { device: device }
+    Device { device }
 }
 
 
 /// A structure that provides access to sysfs/kernel devices.
 pub struct Device {
-    device: *mut ::ffi::udev_device,
+    device: NonNull<::ffi::udev_device>,
 }
 
 impl Drop for Device {
     fn drop(&mut self) {
         unsafe {
-            let udev = ::ffi::udev_device_get_udev(self.device);
+            let udev = ::ffi::udev_device_get_udev(self.device.as_ptr());
 
-            ::ffi::udev_device_unref(self.device);
+            ::ffi::udev_device_unref(self.device.as_ptr());
             ::ffi::udev_unref(udev);
         }
     }
@@ -50,8 +51,9 @@ impl Device {
         let syspath = try!(::util::os_str_to_cstring(syspath));
 
         Ok(unsafe {
+            //SAFETY: null pointers will be checked by the try_alloc macro
             from_raw(try_alloc!(
-                ::ffi::udev_device_new_from_syspath(context.as_ptr(), syspath.as_ptr())
+                ::ffi::udev_device_new_from_syspath(NonNull::new_unchecked(context.as_ptr()), syspath.as_ptr())
             ))
         })
     }
@@ -66,13 +68,13 @@ impl Device {
     /// devices return `true` by default.
     pub fn is_initialized(&self) -> bool {
         unsafe {
-            ::ffi::udev_device_get_is_initialized(self.device) > 0
+            ::ffi::udev_device_get_is_initialized(self.device.as_ptr()) > 0
         }
     }
 
     /// Gets the device's major/minor number.
     pub fn devnum(&self) -> Option<dev_t> {
-        match unsafe { ::ffi::udev_device_get_devnum(self.device) } {
+        match unsafe { ::ffi::udev_device_get_devnum(self.device.as_ptr()) } {
             0 => None,
             n => Some(n),
         }
@@ -85,7 +87,7 @@ impl Device {
     /// `/sys`.
     pub fn syspath(&self) -> Option<&Path> {
         ::util::ptr_to_path(unsafe {
-            ::ffi::udev_device_get_syspath(self.device)
+            ::ffi::udev_device_get_syspath(self.device.as_ptr())
         })
     }
 
@@ -95,7 +97,7 @@ impl Device {
     /// devpath for `tty0` could be `/devices/virtual/tty/tty0`.
     pub fn devpath(&self) -> Option<&OsStr> {
         ::util::ptr_to_os_str(unsafe {
-            ::ffi::udev_device_get_devpath(self.device)
+            ::ffi::udev_device_get_devpath(self.device.as_ptr())
         })
     }
 
@@ -105,13 +107,13 @@ impl Device {
     /// node for `tty0` could be `/dev/tty0`.
     pub fn devnode(&self) -> Option<&Path> {
         ::util::ptr_to_path(unsafe {
-            ::ffi::udev_device_get_devnode(self.device)
+            ::ffi::udev_device_get_devnode(self.device.as_ptr())
         })
     }
 
     /// Returns the parent of the device.
     pub fn parent(&self) -> Option<Device> {
-        let ptr = unsafe { ::ffi::udev_device_get_parent(self.device) };
+        let ptr = unsafe { ::ffi::udev_device_get_parent(self.device.as_ptr()) };
 
         if !ptr.is_null() {
             unsafe {
@@ -131,7 +133,7 @@ impl Device {
     /// Examples of subsystem names are `tty`, `vtconsole`, `block`, `scsi`, and `net`.
     pub fn subsystem(&self) -> Option<&OsStr> {
         ::util::ptr_to_os_str(unsafe {
-            ::ffi::udev_device_get_subsystem(self.device)
+            ::ffi::udev_device_get_subsystem(self.device.as_ptr())
         })
     }
 
@@ -142,7 +144,7 @@ impl Device {
     /// such as `tty1`.
     pub fn sysname(&self) -> Option<&OsStr> {
         ::util::ptr_to_os_str(unsafe {
-            ::ffi::udev_device_get_sysname(self.device)
+            ::ffi::udev_device_get_sysname(self.device.as_ptr())
         })
     }
 
@@ -155,7 +157,7 @@ impl Device {
     /// Some devices don't have instance numbers, such as `/dev/console`, in which case the method
     /// returns `None`.
     pub fn sysnum(&self) -> Option<usize> {
-        let ptr = unsafe { ::ffi::udev_device_get_sysnum(self.device) };
+        let ptr = unsafe { ::ffi::udev_device_get_sysnum(self.device.as_ptr()) };
 
         if !ptr.is_null() {
             match str::from_utf8(unsafe { CStr::from_ptr(ptr) }.to_bytes()) {
@@ -170,12 +172,12 @@ impl Device {
 
     /// Returns the devtype name of the device.
     pub fn devtype(&self) -> Option<&OsStr> {
-        ::util::ptr_to_os_str(unsafe { ::ffi::udev_device_get_devtype(self.device) })
+        ::util::ptr_to_os_str(unsafe { ::ffi::udev_device_get_devtype(self.device.as_ptr()) })
     }
 
     /// Returns the name of the kernel driver attached to the device.
     pub fn driver(&self) -> Option<&OsStr> {
-        ::util::ptr_to_os_str(unsafe { ::ffi::udev_device_get_driver(self.device) })
+        ::util::ptr_to_os_str(unsafe { ::ffi::udev_device_get_driver(self.device.as_ptr()) })
     }
 
     /// Retrieves the value of a device property.
@@ -183,7 +185,7 @@ impl Device {
         match ::util::os_str_to_cstring(property) {
             Ok(prop) => {
                 ::util::ptr_to_os_str(unsafe {
-                    ::ffi::udev_device_get_property_value(self.device, prop.as_ptr())
+                    ::ffi::udev_device_get_property_value(self.device.as_ptr(), prop.as_ptr())
                 })
             },
             Err(_) => None,
@@ -196,7 +198,7 @@ impl Device {
         match ::util::os_str_to_cstring(attribute) {
             Ok(attr) => {
                 ::util::ptr_to_os_str(unsafe {
-                    ::ffi::udev_device_get_sysattr_value(self.device, attr.as_ptr())
+                    ::ffi::udev_device_get_sysattr_value(self.device.as_ptr(), attr.as_ptr())
                 })
             },
             Err(_) => None,
@@ -209,7 +211,7 @@ impl Device {
         let value = try!(::util::os_str_to_cstring(value));
 
         ::util::errno_to_result(unsafe {
-            ::ffi::udev_device_set_sysattr_value(self.device, attribute.as_ptr(), value.as_ptr() as *mut c_char)
+            ::ffi::udev_device_set_sysattr_value(self.device.as_ptr(), attribute.as_ptr(), value.as_ptr() as *mut c_char)
         })
     }
 
@@ -230,7 +232,7 @@ impl Device {
     pub fn properties(&self) -> Properties {
         Properties {
             _device: PhantomData,
-            entry: unsafe { ::ffi::udev_device_get_properties_list_entry(self.device) },
+            entry: unsafe { ::ffi::udev_device_get_properties_list_entry(self.device.as_ptr()) },
         }
     }
 
@@ -251,7 +253,7 @@ impl Device {
     pub fn attributes(&self) -> Attributes {
         Attributes {
             device: self,
-            entry: unsafe { ::ffi::udev_device_get_sysattr_list_entry(self.device) },
+            entry: unsafe { ::ffi::udev_device_get_sysattr_list_entry(self.device.as_ptr()) },
         }
     }
 }
@@ -325,8 +327,8 @@ impl<'a> Iterator for Attributes<'a> {
             self.entry = unsafe { ::ffi::udev_list_entry_get_next(self.entry) };
 
             Some(Attribute {
-                device: self.device,
-                name: name,
+                device: self.device.as_ptr(),
+                name,
             })
         }
         else {
