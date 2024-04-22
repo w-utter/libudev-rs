@@ -9,7 +9,7 @@ use libc::{c_char, dev_t};
 
 use ::context::Context;
 use ::handle::Handle;
-use core::ptr::NonNull;
+use std::ptr::NonNull;
 
 
 pub unsafe fn from_raw(device: *mut ::ffi::udev_device) -> Device {
@@ -327,7 +327,7 @@ impl<'a> Iterator for Attributes<'a> {
             self.entry = unsafe { ::ffi::udev_list_entry_get_next(self.entry) };
 
             Some(Attribute {
-                device: self.device.as_ptr(),
+                device: self.device.as_ref(),
                 name,
             })
         }
