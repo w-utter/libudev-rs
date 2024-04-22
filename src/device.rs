@@ -26,6 +26,9 @@ pub struct Device {
     device: NonNull<::ffi::udev_device>,
 }
 
+unsafe impl Send for Device {}
+unsafe impl Sync for Device {}
+
 impl Drop for Device {
     fn drop(&mut self) {
         unsafe {

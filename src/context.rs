@@ -20,6 +20,9 @@ pub struct Context {
     udev: NonNull<::ffi::udev>,
 }
 
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
+
 impl Clone for Context {
     /// Increments reference count of `libudev` context.
     fn clone(&self) -> Self {
