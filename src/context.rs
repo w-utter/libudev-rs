@@ -49,9 +49,10 @@ impl Handle<::ffi::udev> for Context {
 impl Context {
     /// Creates a new context.
     pub fn new() -> ::Result<Self> {
+        //SAFETY: the try_alloc will catch any null ptrs
+        let udev = unsafe { NonNull::new_unchecked(try_alloc!(::ffi::udev_new()))};
         Ok(Context {
-            //SAFETY: the try_alloc will catch any null ptrs
-            udev: try_alloc!(unsafe { NonNull::new_unchecked(::ffi::udev_new()) }),
+            udev,
         })
     }
 }
