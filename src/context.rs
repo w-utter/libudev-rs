@@ -24,7 +24,8 @@ impl Clone for Context {
     /// Increments reference count of `libudev` context.
     fn clone(&self) -> Self {
         Context {
-            udev: unsafe { ::ffi::udev_ref(self.udev.as_mut()) },
+            //SAFETY: if self contains a valid pointer, then a clone of the pointer is also valid.
+            udev: unsafe { NonNull::new_unchecked(::ffi::udev_ref(self.udev.as_mut())) },
         }
     }
 }
