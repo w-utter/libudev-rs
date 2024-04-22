@@ -25,7 +25,7 @@ impl Clone for Context {
     fn clone(&self) -> Self {
         Context {
             //SAFETY: if self contains a valid pointer, then a clone of the pointer is also valid.
-            udev: unsafe { NonNull::new_unchecked(::ffi::udev_ref(self.udev.as_mut())) },
+            udev: unsafe { NonNull::new_unchecked(::ffi::udev_ref(self.udev.as_ptr())) },
         }
     }
 }
